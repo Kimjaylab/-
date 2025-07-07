@@ -1,0 +1,76 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define DISTANCE_SENSOR_ANALOG A0
+#define PRESSURE_SENSOR_ANALOG A1
+#define VIBRATION_MOTOR 3
+
+#define DISTANCE_THRESHOLD 400
+#define PRESSURE_THRESHOLD 900
+#define BAD_POSTURE_DURATION 10000
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+unsigned long badPostureStart = 0;
+bool inBadPosture = false;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(VIBRATION_MOTOR, OUTPUT);
+  digitalWrite(VIBRATION_MOTOR, LOW);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("System Ready...");
+}
+
+void loop() {
+  int distanceValue = analogRead(DISTANCE_SENSOR_ANALOG);
+  int pressureValue = analogRead(PRESSURE_SENSOR_ANALOG);
+
+  Serial.print("Distance: ");
+  Serial.print(distanceValue);
+  Serial.print(" | Pressure: ");
+  Serial.println(pressureValue);
+
+  bool distanceBad = (distanceValue < DISTANCE_THRESHOLD);
+  bool pressureBad = (pressureValue < PRESSURE_THRESHOLD);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("D:");
+  lcd.print(distanceValue);
+  lcd.print(" P:");
+  lcd.print(pressureValue);
+
+  if (distanceBad || pressureBad) {
+    if (!inBadPosture) {
+      badPostureStart = millis();
+      inBadPosture = true;
+    }
+
+    unsigned long elapsed = millis() - badPostureStart;
+    if (elapsed < BAD_POSTURE_DURATION) {
+      int secLeft = (BAD_POSTURE_DURATION - elapsed) / 1000;
+      lcd.setCursor(0, 1);
+      lcd.print("BAD Posture ");
+      lcd.print(secLeft);
+      lcd.print("s");
+      digitalWrite(VIBRATION_MOTOR, LOW);
+    } else {
+      lcd.setCursor(0, 1);
+      lcd.print("VIBRATION ON!");
+      digitalWrite(VIBRATION_MOTOR, HIGH);
+    }
+  } else {
+    inBadPosture = false;
+    badPostureStart = 0;
+    lcd.setCursor(0, 1);
+    lcd.print("Posture OK     ");
+    digitalWrite(VIBRATION_MOTOR, LOW);
+  }
+
+  delay(100);
+}
