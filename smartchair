@@ -1,76 +1,77 @@
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <Wire.h> // I2C 통신을 위한 Wire 라이브러리 포함
+#include <LiquidCrystal_I2C.h> // I2C 방식 LCD를 제어하기 위한 라이브러리 포함
 
-#define DISTANCE_SENSOR_ANALOG A0
-#define PRESSURE_SENSOR_ANALOG A1
-#define VIBRATION_MOTOR 3
+#define DISTANCE_SENSOR_ANALOG A0 // 거리 센서가 연결된 아날로그 핀 A0
+#define PRESSURE_SENSOR_ANALOG A1 // 압력 센서가 연결된 아날로그 핀 A1
+#define VIBRATION_MOTOR 3 // 진동 모터가 연결된 디지털 핀 3
 
-#define DISTANCE_THRESHOLD 400
-#define PRESSURE_THRESHOLD 900
-#define BAD_POSTURE_DURATION 10000
+#define DISTANCE_THRESHOLD 400 // 거리 센서 기준값 (400 이하일 경우 나쁜 자세로 간주)
+#define PRESSURE_THRESHOLD 900 // 압력 센서 기준값 (900 이하일 경우 착석이 불완전하다고 판단)
+#define BAD_POSTURE_DURATION 10000 // 나쁜 자세 유지 기준값을 10초로 설정
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 16, 2); // LCD 객체 생성 (주소 0x27, 16x2 크기의 LCD 사용)
 
-unsigned long badPostureStart = 0;
-bool inBadPosture = false;
+unsigned long badPostureStart = 0; // 나쁜 자세가 감지된 시작 시간 저장 변수
+bool inBadPosture = false; // 현재 나쁜 자세 상태인지 여부를 저장
 
 void setup() {
-  Serial.begin(9600);
-  pinMode(VIBRATION_MOTOR, OUTPUT);
-  digitalWrite(VIBRATION_MOTOR, LOW);
+  Serial.begin(9600); // 시리얼 통신 시작 (모니터에 디버깅 정보 출력용)
+  pinMode(VIBRATION_MOTOR, OUTPUT); // 진동 모터 핀을 출력 모드로 설정
+  digitalWrite(VIBRATION_MOTOR, LOW); // 시작 시 진동 모터를 꺼둠
 
-  lcd.init();
-  lcd.backlight();
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("System Ready...");
+  lcd.init(); // LCD 초기화
+  lcd.backlight(); // LCD 백라이트 켬
+  lcd.clear(); // LCD 화면 초기화
+  lcd.setCursor(0, 0); // LCD 첫 번째 줄 첫 번째 칸으로 커서 이동
+  lcd.print("System Ready..."); // LCD에 시스템 시작 메시지 출력
 }
 
 void loop() {
-  int distanceValue = analogRead(DISTANCE_SENSOR_ANALOG);
-  int pressureValue = analogRead(PRESSURE_SENSOR_ANALOG);
+  int distanceValue = analogRead(DISTANCE_SENSOR_ANALOG); // 거리 센서의 아날로그 값을 읽음
+  int pressureValue = analogRead(PRESSURE_SENSOR_ANALOG); // 압력 센서의 아날로그 값을 읽음
 
-  Serial.print("Distance: ");
-  Serial.print(distanceValue);
-  Serial.print(" | Pressure: ");
-  Serial.println(pressureValue);
+  Serial.print("Distance: "); // 거리 값 출력 시작
+  Serial.print(distanceValue); // 거리 값 출력
+  Serial.print(" | Pressure: "); // 압력 값 출력
+  Serial.println(pressureValue); // 압력 값 출력 및 줄 바꿈
 
-  bool distanceBad = (distanceValue < DISTANCE_THRESHOLD);
-  bool pressureBad = (pressureValue < PRESSURE_THRESHOLD);
+  bool distanceBad = (distanceValue < DISTANCE_THRESHOLD); // 거리 값이 기준보다 낮으면 나쁜 자세로 판단
+  bool pressureBad = (pressureValue < PRESSURE_THRESHOLD); // 압력 값이 기준보다 낮으면 나쁜 자세로 판단
 
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("D:");
-  lcd.print(distanceValue);
-  lcd.print(" P:");
-  lcd.print(pressureValue);
+  lcd.clear(); // LCD 화면 초기화
+  lcd.setCursor(0, 0); // 첫 번째 줄로 커서 이동
+  lcd.print("D:"); // 거리 값 앞에 표시할 라벨 출력
+  lcd.print(distanceValue); // 거리 센서 값 출력
+  lcd.print(" P:"); // 압력 값 앞에 표시할 라벨 출력
+  lcd.print(pressureValue); // 압력 센서 값 출력
 
-  if (distanceBad || pressureBad) {
-    if (!inBadPosture) {
-      badPostureStart = millis();
-      inBadPosture = true;
+  if (distanceBad || pressureBad) { //거리 또는 압력 중 하나라도 나쁜 자세일 경우
+    if (!inBadPosture) { //이전 루프에서 나쁜 자세가 아니었다면
+      badPostureStart = millis(); //현재 시간을 나쁜 자세 시작 시간으로 저장
+      inBadPosture = true; //나쁜 자세 상태로 전환
     }
 
-    unsigned long elapsed = millis() - badPostureStart;
-    if (elapsed < BAD_POSTURE_DURATION) {
-      int secLeft = (BAD_POSTURE_DURATION - elapsed) / 1000;
-      lcd.setCursor(0, 1);
-      lcd.print("BAD Posture ");
-      lcd.print(secLeft);
-      lcd.print("s");
-      digitalWrite(VIBRATION_MOTOR, LOW);
-    } else {
-      lcd.setCursor(0, 1);
-      lcd.print("VIBRATION ON!");
-      digitalWrite(VIBRATION_MOTOR, HIGH);
+    unsigned long elapsed = millis() - badPostureStart; //나쁜 자세로 경과된 시간 계산
+
+    if (elapsed < BAD_POSTURE_DURATION) { //나쁜 자세 지속 시간이 10초 미만이면
+      int secLeft = (BAD_POSTURE_DURATION - elapsed) / 1000; //남은 시간을 초 단위로 계산
+      lcd.setCursor(0, 1); //두 번째 줄로 커서 이동
+      lcd.print("BAD Posture "); //나쁜 자세 경고 메시지 출력
+      lcd.print(secLeft); //남은 시간 출력
+      lcd.print("s"); //초 단위 표시
+      digitalWrite(VIBRATION_MOTOR, LOW); //아직 진동 모터는 끄기 상태 유지
+    } else { //10초 이상 나쁜 자세가 유지되면
+      lcd.setCursor(0, 1); //두 번째 줄로 커서 이동
+      lcd.print("VIBRATION ON!"); //진동 시작 메시지 출력
+      digitalWrite(VIBRATION_MOTOR, HIGH); //진동 모터 켜기
     }
-  } else {
-    inBadPosture = false;
-    badPostureStart = 0;
-    lcd.setCursor(0, 1);
-    lcd.print("Posture OK     ");
-    digitalWrite(VIBRATION_MOTOR, LOW);
+  } else { //자세가 정상일 경우
+    inBadPosture = false; // 나쁜 자세 플래그 초기화
+    badPostureStart = 0; // 나쁜 자세 시작 시간 초기화
+    lcd.setCursor(0, 1); // 두 번째 줄로 커서 이동
+    lcd.print("Posture OK     "); // 자세가 정상이라는 메시지 출력
+    digitalWrite(VIBRATION_MOTOR, LOW); //진동 모터 끄기
   }
 
-  delay(100);
+  delay(100); // 루프 간 100ms 대기 (0.1초 주기로 측정 반복)
 }
