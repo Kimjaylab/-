@@ -1,0 +1,37 @@
+// 진동모터 MOSFET 모듈의 SIG 핀을 Arduino 3번 핀에 연결하여 모터 작동 확인
+const int motorPin = 3;
+
+void setup() {
+  pinMode(motorPin, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(motorPin, HIGH);  // 진동 ON
+  delay(1000);                   // 1초 동안 진동
+  digitalWrite(motorPin, LOW);   // 진동 OFF
+  delay(1000);                   // 1초 대기
+}
+
+---------------------------------------------------------
+// 진동모터 MOSFET 모듈의 SIG 핀을 Arduino 3번 핀에 연결하여 모터 세기 제어
+const int motorPin = 3;
+
+void setup() {
+  pinMode(motorPin, OUTPUT);
+}
+
+void loop() {
+  // 진동 세기를 점점 증가시킴
+  for (int i = 0; i <= 255; i += 5) {
+    analogWrite(motorPin, i);  // PWM 값: 0(OFF) ~ 255(최대)
+    delay(20);
+  }
+
+  // 진동 세기를 점점 감소시킴
+  for (int i = 255; i >= 0; i -= 5) {
+    analogWrite(motorPin, i);
+    delay(20);
+  }
+
+  delay(1000); // 1초 대기
+}
