@@ -1,0 +1,87 @@
+// 오류 사례별 해결된 코드 정리 (주석 추가 버전)
+
+// 사례 1: 버튼 토글 및 디바운싱 문제 해결
+// 버튼을 누르면 시스템이 ON/OFF 토글되도록 구현, 디바운싱 적용하여 반복 입력 방지
+
+#include <Wire.h>  // I2C 통신을 위한 Wire 라이브러리 포함
+#include <LiquidCrystal_I2C.h>  // I2C 방식 LCD 제어 라이브러리 포함
+
+#define DISTANCE_SENSOR_ANALOG A0       // 거리 센서 입력 핀 지정 (아날로그 A0)
+#define PRESSURE_SENSOR_ANALOG A1       // 압력 센서 입력 핀 지정 (아날로그 A1)
+#define VIBRATION_MOTOR 3               // 진동 모터 제어용 출력 핀 (디지털 3번)
+#define BUTTON_PIN 7                    // 버튼 입력 핀 지정 (디지털 7번)
+
+#define DISTANCE_THRESHOLD 400          // 거리 기준 임계값 설정 (약 20cm, 센서에 따라 조정 필요)
+#define PRESSURE_THRESHOLD 200          // 압력 기준 임계값 설정 (센서 출력에 따라 조정 가능)
+#define BAD_POSTURE_DURATION 10000      // 나쁜 자세 지속 시간 임계값 (10초 이상 유지시 판단)
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);     // LCD 주소(0x27), 16x2 사이즈로 초기화
+
+unsigned long badPostureStart = 0;      // 나쁜 자세 시작 시간 저장 변수
+bool inBadPosture = false;              // 현재 나쁜 자세 상태 여부 저장
+bool systemOn = true;                   // 시스템 ON/OFF 상태 변수
+
+bool prevButtonState = HIGH;            // 이전 버튼 상태 저장 변수
+unsigned long lastDebounceTime = 0;     // 마지막 디바운싱 시간 저장
+unsigned long debounceDelay = 50;       // 디바운싱 지연 시간 (50ms)
+
+void setup() {
+  pinMode(VIBRATION_MOTOR, OUTPUT);     // 진동 모터 핀을 출력으로 설정
+  pinMode(BUTTON_PIN, INPUT);           // 버튼 핀을 입력으로 설정
+  lcd.init();                           // LCD 초기화
+  lcd.backlight();                      // LCD 백라이트 켜기
+  lcd.setCursor(0, 0);                  // LCD 커서 첫 줄 첫 칸으로 이동
+  lcd.print("System ON");               // 시스템 시작 메시지 출력
+}
+
+void loop() {
+  // 버튼 입력 읽기 및 디바운싱 처리
+  int reading = digitalRead(BUTTON_PIN);    // 현재 버튼 상태 읽기
+  if (reading != prevButtonState) {         // 이전 상태와 다르면
+    lastDebounceTime = millis();            // 디바운싱 시간 초기화
+  }
+  if ((millis() - lastDebounceTime) > debounceDelay) { // 디바운싱 시간 경과 시
+    if (reading == LOW && prevButtonState == HIGH) {    // 버튼 눌림 감지 (HIGH -> LOW)
+      systemOn = !systemOn;             // 시스템 상태 토글
+      lcd.clear();                      // LCD 화면 초기화
+      if (systemOn) {
+        lcd.setCursor(0, 0);
+        lcd.print("System ON");        // 시스템 ON 메시지 출력
+      } else {
+        lcd.setCursor(0, 0);
+        lcd.print("System OFF");       // 시스템 OFF 메시지 출력
+        digitalWrite(VIBRATION_MOTOR, LOW);  // 진동 모터 OFF
+      }
+    }
+  }
+  prevButtonState = reading;            // 이전 버튼 상태 업데이트
+
+  // 시스템 OFF 상태면 동작 종료
+  if (!systemOn) return;
+
+  // 센서 값 읽기
+  int distanceValue = analogRead(DISTANCE_SENSOR_ANALOG); // 거리 센서 값 읽기
+  int pressureValue = analogRead(PRESSURE_SENSOR_ANALOG); // 압력 센서 값 읽기
+
+  // 나쁜 자세 판단 조건 검사
+  if (distanceValue > DISTANCE_THRESHOLD || pressureValue < PRESSURE_THRESHOLD) {
+    if (!inBadPosture) {
+      badPostureStart = millis();       // 나쁜 자세 시작 시간 기록
+      inBadPosture = true;              // 나쁜 자세 상태로 전환
+    }
+    if (millis() - badPostureStart > BAD_POSTURE_DURATION) { // 10초 이상 지속 시
+      digitalWrite(VIBRATION_MOTOR, HIGH); // 진동 모터 ON
+      lcd.setCursor(0, 1);
+      lcd.print("VIBRATION ON ");      // LCD에 진동 작동 표시
+    }
+  } else {
+    // 좋은 자세로 판단될 경우 초기화
+    inBadPosture = false;               // 나쁜 자세 상태 해제
+    badPostureStart = 0;                // 시작 시간 초기화
+    digitalWrite(VIBRATION_MOTOR, LOW); // 진동 모터 OFF
+    lcd.setCursor(0, 1);
+    lcd.print("Posture OK   ");        // LCD에 좋은 자세 표시
+  }
+}
+
+// 사례 2, 3 등 다른 해결 코드가 있을 경우 이 아래에 별도로 추가
