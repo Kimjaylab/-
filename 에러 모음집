@@ -1,0 +1,152 @@
+// 실패한 코드 사례 정리
+
+// 실패 사례 1: 버튼 바운싱으로 진동 모터가 다시 켜지는 문제
+// 원인: 디바운싱 부족, systemOn 토글이 반복됨
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define DISTANCE_SENSOR_ANALOG A0
+#define PRESSURE_SENSOR_ANALOG A1
+#define VIBRATION_MOTOR 3
+#define BUTTON_PIN 7
+
+#define DISTANCE_THRESHOLD 400
+#define PRESSURE_THRESHOLD 200
+#define BAD_POSTURE_DURATION 10000
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+unsigned long badPostureStart = 0;
+bool inBadPosture = false;
+bool systemOn = true;
+
+void setup() {
+  pinMode(VIBRATION_MOTOR, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT);
+  lcd.init();
+  lcd.backlight();
+}
+
+void loop() {
+  int buttonState = digitalRead(BUTTON_PIN);
+  if (buttonState == LOW) {
+    systemOn = !systemOn; // 바운싱 발생 가능성
+    delay(50);            // 소프트웨어 디바운싱 미흡
+  }
+
+  if (!systemOn) {
+    lcd.setCursor(0, 0);
+    lcd.print("System OFF     ");
+    digitalWrite(VIBRATION_MOTOR, LOW);
+    return;
+  }
+
+  int distanceValue = analogRead(DISTANCE_SENSOR_ANALOG);
+  int pressureValue = analogRead(PRESSURE_SENSOR_ANALOG);
+
+  if (distanceValue < DISTANCE_THRESHOLD || pressureValue < PRESSURE_THRESHOLD) {
+    if (!inBadPosture) {
+      badPostureStart = millis();
+      inBadPosture = true;
+    }
+
+    if (millis() - badPostureStart > BAD_POSTURE_DURATION) {
+      digitalWrite(VIBRATION_MOTOR, HIGH);
+      lcd.setCursor(0, 1);
+      lcd.print("VIBRATION ON  ");
+    }
+  } else {
+    inBadPosture = false;
+    badPostureStart = 0;
+    digitalWrite(VIBRATION_MOTOR, LOW);
+    lcd.setCursor(0, 1);
+    lcd.print("Posture OK    ");
+  }
+}
+
+
+// 실패 사례 2: 슬라이드 스위치 ON/OFF 상태 반전 오류
+// 원인: LOW가 ON, HIGH가 OFF인데 코드상 반대로 처리됨
+#define SLIDE_SWITCH_PIN 9
+
+void setup() {
+  pinMode(SLIDE_SWITCH_PIN, INPUT);
+}
+
+void loop() {
+  int switchState = digitalRead(SLIDE_SWITCH_PIN);
+  if (switchState == LOW) {
+    lcd.print("Switch OFF");  // 실제로는 ON인데 OFF로 인식
+    digitalWrite(VIBRATION_MOTOR, LOW);
+  }
+}
+
+
+// 실패 사례 3: LCD 깜빡임 + 진동 모터 오작동
+// 원인: loop 안에서 lcd.clear() 반복 호출, 진동 모터 강제 종료 로직 없음
+lcd.clear();  // 지속적 깜빡임 유발
+
+if (digitalRead(BUTTON_PIN) == LOW) {
+  digitalWrite(VIBRATION_MOTOR, LOW); // 진동 모터 강제 종료 없음
+  delay(100);
+}
+
+
+// 실패 사례 4: 정삼 고정 실패 + 토글 불안정
+// 원인: 버튼 바운싱으로 토글 반복됨
+bool overridePosture = false;
+
+if (digitalRead(BUTTON_PIN) == LOW) {
+  overridePosture = !overridePosture;  // 바운싱으로 계속 전환됨
+  delay(50);
+}
+
+if (overridePosture) {
+  lcd.print("Override ON");
+  digitalWrite(VIBRATION_MOTOR, LOW);
+}
+
+
+// 실패 사례 5: 시스템 ON 복귀 실패
+// 원인: systemEnabled 플래그가 OFF로 바뀐 후 다시 ON되지 않음
+bool systemEnabled = true;
+
+if (digitalRead(BUTTON_PIN) == LOW) {
+  systemEnabled = !systemEnabled;
+  delay(50);
+}
+
+if (!systemEnabled) {
+  digitalWrite(VIBRATION_MOTOR, LOW);
+  lcd.print("Disabled");
+}
+
+
+// 실패 사례 6: 강제 고정 중 진동 발생
+// 원인: inBadPosture 값 초기화 누락
+bool overridePostureMode = true;
+
+if (overridePostureMode) {
+  lcd.print("Override Active");
+  // inBadPosture 상태 초기화 안되어 진동 유지됨
+}
+
+
+// 실패 사례 7: 거리 판단 방향 오류
+// 원인: 20cm 이상일 때 나쁜 자세로 간주해야 하나, 반대로 처리됨
+int distance = analogRead(DISTANCE_SENSOR_ANALOG);
+
+if (distance < DISTANCE_THRESHOLD) {
+  // 실제로는 > 여야 했음
+  digitalWrite(VIBRATION_MOTOR, HIGH);
+}
+
+
+// 실패 사례 8: INPUT_PULLUP 미사용
+// 원인: INPUT으로 설정해 스위치가 floating 상태됨
+pinMode(SLIDE_SWITCH_PIN, INPUT);
+
+int sw = digitalRead(SLIDE_SWITCH_PIN);
+if (sw == LOW) {
+  lcd.print("No Input"); // 스위치 입력 인식 안됨
+}
