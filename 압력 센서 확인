@@ -1,0 +1,31 @@
+const int distancePin = A0;     // 거리 센서
+const int pressurePin = A1;     // 압력 센서
+const int motorPin    = 3;      // 진동 모터
+
+const int distanceThreshold = 500;  // 거리 기준값
+const int pressureThreshold = 200;  // 압력 기준값
+
+void setup() {
+  pinMode(motorPin, OUTPUT);
+  digitalWrite(motorPin, LOW);
+  Serial.begin(9600);  // 디버깅용
+}
+
+void loop() {
+  int distanceValue = analogRead(distancePin);
+  int pressureValue = analogRead(pressurePin);
+
+  Serial.print("Distance: ");
+  Serial.print(distanceValue);
+  Serial.print(" | Pressure: ");
+  Serial.println(pressureValue);
+
+  // 둘 중 하나라도 조건을 만족하면 진동 ON
+  if (distanceValue < distanceThreshold || pressureValue > pressureThreshold) {
+    digitalWrite(motorPin, HIGH);  // 진동 ON
+  } else {
+    digitalWrite(motorPin, LOW);   // 진동 OFF
+  }
+
+  delay(100);
+}
