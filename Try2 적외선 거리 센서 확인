@@ -1,0 +1,22 @@
+const int sensorPin = A0;    // 거리 센서 출력 핀
+const int motorPin  = 3;     // 진동 모터 제어 핀
+
+void setup() {
+  pinMode(motorPin, OUTPUT);
+  digitalWrite(motorPin, LOW);  // 처음엔 진동 OFF
+  Serial.begin(9600);           // 센서값 확인용 (디버깅)
+}
+
+void loop() {
+  int sensorValue = analogRead(sensorPin);  // 0 ~ 1023
+  Serial.print("Sensor: ");
+  Serial.println(sensorValue);
+
+  if (sensorValue < 500) {  // 손이 20cm 이상 멀어졌다고 판단
+    digitalWrite(motorPin, HIGH);  // 진동 ON
+  } else {
+    digitalWrite(motorPin, LOW);   // 진동 OFF
+  }
+
+  delay(100);  // 너무 빠른 반응 방지
+}
